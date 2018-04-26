@@ -24,15 +24,18 @@ public class Yeela extends AbstractNegotiationParty {
 	private final String description = "Example Agent";
 
     private Bid lastReceivedOffer; // offer on the table
-    private Bid myLastOffer;
-
+    private Learner curLearner;
+    private boolean firstToAct;
+    private double timeToGiveUp = 0.95;
+    
     @Override
     public void init(NegotiationInfo info) {
         super.init(info);
 
         System.out.println("Discount Factor is " + info.getUtilitySpace().getDiscountFactor());
         System.out.println("Reservation Value is " + info.getUtilitySpace().getReservationValueUndiscounted());
-
+        firstToAct = true;
+        curLearner.init(getMaxUtilityBid(), info.getUtilitySpace().getDomain().getIssues().size());
     }
 
     /**
@@ -51,23 +54,25 @@ public class Yeela extends AbstractNegotiationParty {
 
         System.out.println(time);
 
-        // First half of the negotiation offering the max utility (the best agreement possible) for Example Agent
-        if (time < 0.5) {
-            return new Offer(this.getPartyId(), this.getMaxUtilityBid());
-        } else {
-
-            // Accepts the bid on the table in this phase,
-            // if the utility of the bid is higher than Example Agent's last bid.
-            if (lastReceivedOffer != null
-                && myLastOffer != null
-                && this.utilitySpace.getUtility(lastReceivedOffer) > this.utilitySpace.getUtility(myLastOffer)) {
-
-                return new Accept(this.getPartyId(), lastReceivedOffer);
-            } else {
-                // Offering a random bid
-                myLastOffer = generateRandomBid();
-                return new Offer(this.getPartyId(), myLastOffer);
-            }
+        // if we are first
+        if (firstToAct)
+        {
+        	return new Offer(this.getPartyId(), this.getMaxUtilityBid());
+        }
+        
+        // create new offer
+        Bid bid = curLearner.run(lastReceivedOffer);
+        
+        // decide whether to offer it or accept counter offer
+        if ((bid == lastReceivedOffer) ||
+        	(this.utilitySpace.getUtility(lastReceivedOffer) >= this.utilitySpace.getUtility(bid)) ||
+        	(timeToGiveUp < time))
+        {
+        	return new Accept(this.getPartyId(), lastReceivedOffer);
+        }
+        else
+        {
+        	return new Offer(this.getPartyId(), bid);
         }
     }
 
@@ -85,6 +90,7 @@ public class Yeela extends AbstractNegotiationParty {
 
             // storing last received offer
             lastReceivedOffer = offer.getBid();
+            firstToAct = false;
         }
     }
 
