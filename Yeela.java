@@ -25,8 +25,9 @@ public class Yeela extends AbstractNegotiationParty {
 
     private Bid lastReceivedOffer; // offer on the table
     private Learner curLearner;
-    private boolean firstToAct;
+    private boolean firstGameAct;
     private double timeToGiveUp = 0.95;
+    private List<Bid> bids;
     
     @Override
     public void init(NegotiationInfo info) {
@@ -34,7 +35,7 @@ public class Yeela extends AbstractNegotiationParty {
 
         System.out.println("Discount Factor is " + info.getUtilitySpace().getDiscountFactor());
         System.out.println("Reservation Value is " + info.getUtilitySpace().getReservationValueUndiscounted());
-        firstToAct = true;
+        firstGameAct = true;
         curLearner.init(getMaxUtilityBid(), info.getUtilitySpace().getDomain().getIssues().size());
     }
 
@@ -55,25 +56,23 @@ public class Yeela extends AbstractNegotiationParty {
         System.out.println(time);
 
         // if we are first
-        if (firstToAct)
+        if (firstGameAct)
         {
+        	firstGameAct = false;
+        	bids.add(this.getMaxUtilityBid());
         	return new Offer(this.getPartyId(), this.getMaxUtilityBid());
         }
         
-        // create new offer
-        Bid bid = curLearner.run(lastReceivedOffer);
         
         // decide whether to offer it or accept counter offer
-        if ((bid == lastReceivedOffer) ||
-        	(this.utilitySpace.getUtility(lastReceivedOffer) >= this.utilitySpace.getUtility(bid)) ||
-        	(timeToGiveUp < time))
+        if ((bids.contains(lastReceivedOffer)) || (timeToGiveUp < time))
         {
         	return new Accept(this.getPartyId(), lastReceivedOffer);
         }
-        else
-        {
-        	return new Offer(this.getPartyId(), bid);
-        }
+        
+        // create new offer
+        bids.add(curLearner.run(lastReceivedOffer));
+        return new Offer(this.getPartyId(), bids.get(bids.size() - 1));
     }
 
     /**
@@ -90,7 +89,7 @@ public class Yeela extends AbstractNegotiationParty {
 
             // storing last received offer
             lastReceivedOffer = offer.getBid();
-            firstToAct = false;
+            firstGameAct = false;
         }
     }
 
