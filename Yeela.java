@@ -9,6 +9,7 @@ import negotiator.parties.AbstractNegotiationParty;
 import negotiator.parties.NegotiationInfo;
 
 import java.util.List;
+import java.util.Vector;
 
 /**
  * group1.Agent1 returns the bid that maximizes its own utility for half of the negotiation session.
@@ -36,7 +37,13 @@ public class Yeela extends AbstractNegotiationParty {
         System.out.println("Discount Factor is " + info.getUtilitySpace().getDiscountFactor());
         System.out.println("Reservation Value is " + info.getUtilitySpace().getReservationValueUndiscounted());
         firstGameAct = true;
-        curLearner.init(getMaxUtilityBid(), info.getUtilitySpace().getDomain().getIssues().size());
+        List<Bid> randomBids = new Vector<Bid>();
+		for (int i = 0; i < 200; ++i)
+		{
+			randomBids.add(generateRandomBid());
+		}
+		int size = info.getUtilitySpace().getDomain().getIssues().size();
+		curLearner = new Learner(randomBids, getMaxUtilityBid(), size, info);
     }
 
     /**
@@ -86,7 +93,7 @@ public class Yeela extends AbstractNegotiationParty {
 
         if (act instanceof Offer) { // sender is making an offer
             Offer offer = (Offer) act;
-
+            
             // storing last received offer
             lastReceivedOffer = offer.getBid();
             firstGameAct = false;
