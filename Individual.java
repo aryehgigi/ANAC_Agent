@@ -12,11 +12,16 @@ import negotiator.utility.EvaluatorDiscrete;
 import negotiator.parties.NegotiationInfo;
 import java.util.Random;
 
-public class Individual {
+public class Individual implements Comparable<Individual> {
+	private Double ALPHA = 0.5; // TODO
+	
 	private HashMap<Integer, Value> m_gene;
 	private Double m_util;
 	private NegotiationInfo m_info;
 	private Random m_rand;
+	private Bid m_opponent;
+	private Double m_best;
+	private Double m_maxDist;
 	
 	public Individual(Bid b, NegotiationInfo info)
 	{
@@ -24,18 +29,37 @@ public class Individual {
 		m_info = info;
 		m_util = CalcUtility();
 		m_rand = new Random();
+		
+        try
+        {
+        	Bid best = m_info.getUtilitySpace().getMaxUtilityBid();
+        	m_best = m_info.getUtilitySpace().getUtility(best);
+        	m_maxDist = Dist(
+        		best.getValues(),
+				m_info.getUtilitySpace().getMinUtilityBid().getValues());
+        }
+        catch (Exception e)
+        {
+        	m_maxDist = Double.MIN_VALUE;
+            e.printStackTrace();
+        }
 	}
 	
-	public Boolean equals(Individual other)
+	@Override
+	public int compareTo(Individual other)
 	{
-		for(int i = 0; i < m_gene.size(); ++i)
+		AdditiveUtilitySpace additiveUtilitySpace = (AdditiveUtilitySpace) m_info.getUtilitySpace();
+		List<Issue> issues = additiveUtilitySpace.getDomain().getIssues();
+		
+		for(Issue issue : issues)
 		{
-			if (!m_gene.get(i).equals(other.GetValue(i)))
+			if (!m_gene.get(issue.getNumber()).equals(other.GetValue(issue.getNumber())))
 			{
-				return false;
-			}			
+				return this.GetFitness() > other.GetFitness() ? 1 : -1;
+			}
 		}
-		return true;
+		return 0;
+
 	}
 	
 	public Value GetValue(Integer key)
@@ -46,6 +70,62 @@ public class Individual {
 	public void SetValue(Integer key, Value value)
 	{
 		m_gene.put(key, value);
+	}
+	
+	private Double TP()
+	{
+		// TODO
+		return 1.0;
+	}
+	
+	private Double Dist(HashMap<Integer, Value> v1, HashMap<Integer, Value> v2)
+	{
+		Double d = 0.0;
+		
+		AdditiveUtilitySpace additiveUtilitySpace = (AdditiveUtilitySpace) m_info.getUtilitySpace();
+		List<Issue> issues = additiveUtilitySpace.getDomain().getIssues();
+
+		for (Issue issue : issues)
+		{
+		    int issueNumber = issue.getNumber();
+		    Double weight = additiveUtilitySpace.getWeight(issueNumber);
+
+		    // Assuming that issues are discrete only
+		    EvaluatorDiscrete evaluatorDiscrete = (EvaluatorDiscrete) additiveUtilitySpace.getEvaluator(issueNumber);
+		    
+        	try
+        	{
+    		    Double evaluation1 = evaluatorDiscrete.getEvaluation((ValueDiscrete)v1.get(issueNumber));
+    		    Double evaluation2 = evaluatorDiscrete.getEvaluation((ValueDiscrete)v2.get(issueNumber));
+			
+        		// TODO - validate normalization
+    		    if ((evaluation1 > 1.0) || (evaluation2 > 1.0))
+    		    {
+    		    	int debug = 0;
+    		    }
+				d += (weight * Math.pow(evaluation1 - evaluation2, 2));
+			}
+        	catch (Exception e)
+        	{
+				// TODO Auto-generated catch block
+        		d = Double.POSITIVE_INFINITY;
+				e.printStackTrace();
+			}
+		}
+		
+		return Math.sqrt(d);
+	}
+	
+	public void UpdateOpponent(Bid opponent)
+	{
+		m_opponent = opponent;
+	}
+	
+	public Double GetFitness()
+	{
+        Double otherSide = (1 - ALPHA) * TP() * (1 - (Dist(m_gene, m_opponent.getValues()) / m_maxDist));
+        Double ourSide = ALPHA * TP() * (this.GetUtility() / m_best);
+		return ourSide + otherSide;
 	}
 	
 	public Double GetUtility()
@@ -73,11 +153,12 @@ public class Individual {
 		    
 		    for (ValueDiscrete valueDiscrete : issueDiscrete.getValues())
 		    {
-		        if (valueDiscrete.getValue().equals(m_gene.get(issueNumber).toString()))
+		        if (0 == valueDiscrete.getValue().compareTo(m_gene.get(issueNumber).toString()))
 		        {
 		        	try
 		        	{
 						evaluation = evaluatorDiscrete.getEvaluation(valueDiscrete);
+						util += (weight * evaluation);
 					}
 		        	catch (Exception e)
 		        	{
@@ -86,20 +167,22 @@ public class Individual {
 					}
 		        }
 		    }
-		    
-		    util += (weight * evaluation);
 		}
 		return util;
 	}
 	
-	public Individual Clone(Bid randomBid) // getting a random bid because only an agent can generate one
+	public Individual Clone()
 	{
+		Bid randomBid = m_info.getUtilitySpace().getDomain().getRandomBid(m_rand);
+
 		for (Integer key : m_gene.keySet())
 		{
 			randomBid.putValue(key, m_gene.get(key));
 		}
 		
-		return new Individual(randomBid, m_info);
+		Individual ind = new Individual(randomBid, m_info);
+		ind.UpdateOpponent(m_opponent);
+		return ind;
 	}
 	
 	public void Mutate()
@@ -107,7 +190,7 @@ public class Individual {
 		AdditiveUtilitySpace additiveUtilitySpace = (AdditiveUtilitySpace) m_info.getUtilitySpace();
 		List<Issue> issues = additiveUtilitySpace.getDomain().getIssues();
 		
-		int randomNum = m_rand.nextInt(issues.size()) + 1;
+		int randomNum = m_rand.nextInt(issues.size());
 		Issue issue = issues.get(randomNum);
 		
 		IssueDiscrete issueDiscrete = (IssueDiscrete) issue;
@@ -115,7 +198,7 @@ public class Individual {
 		randomNum = issueNumber;
 		while (randomNum == issueNumber)
 		{
-			randomNum = m_rand.nextInt(issueDiscrete.getValues().size()) + 1;
+			randomNum = m_rand.nextInt(issueDiscrete.getValues().size());
 		}
 		
 		Value newValue = issueDiscrete.getValues().get(randomNum);
@@ -127,18 +210,21 @@ public class Individual {
 		AdditiveUtilitySpace additiveUtilitySpace = (AdditiveUtilitySpace) m_info.getUtilitySpace();
 		List<Issue> issues = additiveUtilitySpace.getDomain().getIssues();
 		
-		int randomNum = m_rand.nextInt(issues.size() - 1) + 1; // minus one since crossover location is in gap between alleles
-		
-		for (Integer key : m_gene.keySet())
+		if (1 < issues.size()) // otherwise no need to crossover
 		{
-			if (key > randomNum)
-			{	
-				break;
-			}
+			int randomNum = m_rand.nextInt(issues.size() - 1) + 1; // minus one since crossover location is in gap between alleles
 			
-			Value temp = m_gene.get(key);
-			m_gene.put(key, other.GetValue(key));
-			other.SetValue(key, temp);
+			for (Integer key : m_gene.keySet())
+			{
+				if (key > randomNum)
+				{	
+					break;
+				}
+				
+				Value temp = m_gene.get(key);
+				m_gene.put(key, other.GetValue(key));
+				other.SetValue(key, temp);
+			}
 		}
 	}
 }

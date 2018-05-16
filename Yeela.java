@@ -29,6 +29,7 @@ public class Yeela extends AbstractNegotiationParty {
     private boolean firstGameAct;
     private double timeToGiveUp = 0.95;
     private List<Bid> bids;
+    private List<Bid> bidsOpponent;
     
     @Override
     public void init(NegotiationInfo info) {
@@ -37,13 +38,11 @@ public class Yeela extends AbstractNegotiationParty {
         System.out.println("Discount Factor is " + info.getUtilitySpace().getDiscountFactor());
         System.out.println("Reservation Value is " + info.getUtilitySpace().getReservationValueUndiscounted());
         firstGameAct = true;
-        List<Bid> randomBids = new Vector<Bid>();
-		for (int i = 0; i < 200; ++i)
-		{
-			randomBids.add(generateRandomBid());
-		}
-		int size = info.getUtilitySpace().getDomain().getIssues().size();
-		curLearner = new Learner(randomBids, getMaxUtilityBid(), size, info);
+        bids = new Vector<Bid>();
+        bidsOpponent = new Vector<Bid>();
+        
+        int size = info.getUtilitySpace().getDomain().getIssues().size();
+		curLearner = new Learner(getMaxUtilityBid(), size, info);
     }
 
     /**
@@ -70,6 +69,7 @@ public class Yeela extends AbstractNegotiationParty {
         	return new Offer(this.getPartyId(), this.getMaxUtilityBid());
         }
         
+        bidsOpponent.add(lastReceivedOffer);
         
         // decide whether to offer it or accept counter offer
         if ((bids.contains(lastReceivedOffer)) || (timeToGiveUp < time))
@@ -79,6 +79,10 @@ public class Yeela extends AbstractNegotiationParty {
         
         // create new offer
         bids.add(curLearner.run(lastReceivedOffer));
+        if (bidsOpponent.contains(bids.get(bids.size() - 1)))
+        {
+        	return new Accept(this.getPartyId(), bids.get(bids.size() - 1));	
+        }
         return new Offer(this.getPartyId(), bids.get(bids.size() - 1));
     }
 
