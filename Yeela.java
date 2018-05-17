@@ -22,27 +22,27 @@ public class Yeela extends AbstractNegotiationParty {
 	 */
 	private static final long serialVersionUID = -2676016971703971492L;
 
-	private final String description = "Example Agent";
+	private final String description = "Yeela Agent";
 
     private Bid lastReceivedOffer; // offer on the table
+    private Bid bestReceivedOffer; // best offer seen
     private Learner curLearner;
     private boolean firstGameAct;
     private double timeToGiveUp = 0.95;
     private List<Bid> bids;
-    private List<Bid> bidsOpponent;
-    
+    private NegotiationInfo m_info;
     @Override
     public void init(NegotiationInfo info) {
         super.init(info);
 
         System.out.println("Discount Factor is " + info.getUtilitySpace().getDiscountFactor());
         System.out.println("Reservation Value is " + info.getUtilitySpace().getReservationValueUndiscounted());
-        firstGameAct = true;
-        bids = new Vector<Bid>();
-        bidsOpponent = new Vector<Bid>();
         
-        int size = info.getUtilitySpace().getDomain().getIssues().size();
-		curLearner = new Learner(getMaxUtilityBid(), size, info);
+        firstGameAct = true;
+        m_info = info;
+        bids = new Vector<Bid>();
+        
+		curLearner = new Learner(getMaxUtilityBid(), info);
     }
 
     /**
@@ -69,21 +69,39 @@ public class Yeela extends AbstractNegotiationParty {
         	return new Offer(this.getPartyId(), this.getMaxUtilityBid());
         }
         
-        bidsOpponent.add(lastReceivedOffer);
-        
-        // decide whether to offer it or accept counter offer
-        if ((bids.contains(lastReceivedOffer)) || (timeToGiveUp < time))
+        try
         {
+        	if (timeToGiveUp < time)
+        	{
+        		return new Accept(this.getPartyId(), lastReceivedOffer);
+        	}
+
+        	// create new offer
+	        bids.add(curLearner.run(lastReceivedOffer));
+
+	        // decide whether to accept counter offer
+	        for (Bid bid : bids)
+	        {
+		        if (m_info.getUtilitySpace().getUtility(lastReceivedOffer) == m_info.getUtilitySpace().getUtility(bid))
+	        	{
+	        		return new Accept(this.getPartyId(), lastReceivedOffer);
+	        	}
+	        }
+
+	        // decide whether to offer previous counter offer since its better than newly suggested offer
+	        if (m_info.getUtilitySpace().getUtility(bestReceivedOffer) > m_info.getUtilitySpace().getUtility(bids.get(bids.size() - 1)))
+	        {
+	        	return new Offer(this.getPartyId(), bestReceivedOffer);
+	        }
+
+	        // suggest our new offer
+	        return new Offer(this.getPartyId(), bids.get(bids.size() - 1));
+        }
+        catch (Exception e)
+		{
+			e.printStackTrace();
         	return new Accept(this.getPartyId(), lastReceivedOffer);
         }
-        
-        // create new offer
-        bids.add(curLearner.run(lastReceivedOffer));
-        if (bidsOpponent.contains(bids.get(bids.size() - 1)))
-        {
-        	return new Accept(this.getPartyId(), bids.get(bids.size() - 1));	
-        }
-        return new Offer(this.getPartyId(), bids.get(bids.size() - 1));
     }
 
     /**
@@ -100,6 +118,11 @@ public class Yeela extends AbstractNegotiationParty {
             
             // storing last received offer
             lastReceivedOffer = offer.getBid();
+            
+            if ((null == bestReceivedOffer) || (m_info.getUtilitySpace().getUtility(bestReceivedOffer) < m_info.getUtilitySpace().getUtility(lastReceivedOffer)))
+            {
+            	bestReceivedOffer = lastReceivedOffer;
+            }
             firstGameAct = false;
         }
     }
@@ -114,7 +137,8 @@ public class Yeela extends AbstractNegotiationParty {
     }
 
     private Bid getMaxUtilityBid() {
-        try {
+        try
+        {
             return this.utilitySpace.getMaxUtilityBid();
         } catch (Exception e) {
             e.printStackTrace();

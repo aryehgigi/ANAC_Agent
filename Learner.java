@@ -10,23 +10,19 @@ import negotiator.issue.Issue;
 import negotiator.parties.NegotiationInfo;
 
 public class Learner {
-	private int MAX_EVOLUTIONS = 3; //TODO
+	private int MAX_EVOLUTIONS = 10; //TODO
 	private int POPULATION_SIZE = 200; // TODO
 	private int MATING_POOL_SIZE = 150; // TODO
 	private double CROSS_RATE = 0.6; // TODO
 	private double MUT_RATE = 0.05; // TODO
 	private double ELITISM_RATE = 0.1; // TODO
 	
-	private Bid m_bestBid;
-	private int m_dim;
 	private List<Individual> m_population;
 	private Random m_rand;
 	private NegotiationInfo m_info;
 			
-	public Learner(Bid bestBid, int dim, NegotiationInfo info)
+	public Learner(Bid bestBid, NegotiationInfo info)
 	{
-		m_dim = dim;
-		m_bestBid = bestBid;
 		m_info = info;
 		
 		m_population = new Vector<Individual>();
@@ -68,26 +64,35 @@ public class Learner {
 	
 	private List<Individual> Selection()
 	{
-		int popSize = m_population.size();
-		Collections.sort(m_population);
 		List<Individual> matingPool = new Vector<Individual>();
-		boolean[] taken = new boolean[popSize];
-		
-		while (matingPool.size() < MATING_POOL_SIZE)
+		int popSize = m_population.size();
+		try
 		{
-			for (int i = 0; i < popSize; ++i)
+			Collections.sort(m_population);
+			boolean[] taken = new boolean[popSize];
+			
+			while (matingPool.size() < MATING_POOL_SIZE)
 			{
-				if(!taken[i])
+				for (int i = 0; i < popSize; ++i)
 				{
-					double pr = m_rand.nextDouble();
-					if ((1.0 / (i + 1)) > pr) // TODO - validate it equals to: 1 - (i * (1.0 / (i + 1)))
+					if(!taken[i])
 					{
-						matingPool.add(m_population.get(popSize - 1 - i).Clone());
-						taken[i] =  true;
+						double pr = m_rand.nextDouble();
+						if ((1.0 / (i + 1)) > pr)
+						{
+							matingPool.add(m_population.get(popSize - 1 - i).Clone());
+							taken[i] =  true;
+						}
 					}
 				}
 			}
 		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+			matingPool = m_population.subList(0, (int)(m_population.size() * 0.75));
+		}
+
 		
 		return matingPool;
 	}

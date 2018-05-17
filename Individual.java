@@ -13,7 +13,7 @@ import negotiator.parties.NegotiationInfo;
 import java.util.Random;
 
 public class Individual implements Comparable<Individual> {
-	private Double ALPHA = 0.5; // TODO
+	private Double ALPHA = 0.9; // TODO
 	
 	private HashMap<Integer, Value> m_gene;
 	private Double m_util;
@@ -48,18 +48,15 @@ public class Individual implements Comparable<Individual> {
 	@Override
 	public int compareTo(Individual other)
 	{
-		AdditiveUtilitySpace additiveUtilitySpace = (AdditiveUtilitySpace) m_info.getUtilitySpace();
-		List<Issue> issues = additiveUtilitySpace.getDomain().getIssues();
-		
-		for(Issue issue : issues)
-		{
-			if (!m_gene.get(issue.getNumber()).equals(other.GetValue(issue.getNumber())))
-			{
-				return this.GetFitness() > other.GetFitness() ? 1 : -1;
-			}
+    	try
+    	{
+    		return (int) java.lang.Math.signum(this.GetFitness() - other.GetFitness());
+ 		}
+    	catch (Exception e)
+    	{
+			e.printStackTrace();
+			return 0;
 		}
-		return 0;
-
 	}
 	
 	public Value GetValue(Integer key)
@@ -98,16 +95,10 @@ public class Individual implements Comparable<Individual> {
     		    Double evaluation1 = evaluatorDiscrete.getEvaluation((ValueDiscrete)v1.get(issueNumber));
     		    Double evaluation2 = evaluatorDiscrete.getEvaluation((ValueDiscrete)v2.get(issueNumber));
 			
-        		// TODO - validate normalization
-    		    if ((evaluation1 > 1.0) || (evaluation2 > 1.0))
-    		    {
-    		    	int debug = 0;
-    		    }
 				d += (weight * Math.pow(evaluation1 - evaluation2, 2));
 			}
         	catch (Exception e)
         	{
-				// TODO Auto-generated catch block
         		d = Double.POSITIVE_INFINITY;
 				e.printStackTrace();
 			}
@@ -162,7 +153,6 @@ public class Individual implements Comparable<Individual> {
 					}
 		        	catch (Exception e)
 		        	{
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 		        }
@@ -175,9 +165,16 @@ public class Individual implements Comparable<Individual> {
 	{
 		Bid randomBid = m_info.getUtilitySpace().getDomain().getRandomBid(m_rand);
 
-		for (Integer key : m_gene.keySet())
-		{
-			randomBid.putValue(key, m_gene.get(key));
+    	try
+    	{
+    		for (Integer key : m_gene.keySet())
+    		{
+    			randomBid.putValue(key, m_gene.get(key));
+    		}
+		}
+    	catch (Exception e)
+    	{
+			e.printStackTrace();
 		}
 		
 		Individual ind = new Individual(randomBid, m_info);
@@ -187,44 +184,59 @@ public class Individual implements Comparable<Individual> {
 	
 	public void Mutate()
 	{
-		AdditiveUtilitySpace additiveUtilitySpace = (AdditiveUtilitySpace) m_info.getUtilitySpace();
-		List<Issue> issues = additiveUtilitySpace.getDomain().getIssues();
-		
-		int randomNum = m_rand.nextInt(issues.size());
-		Issue issue = issues.get(randomNum);
-		
-		IssueDiscrete issueDiscrete = (IssueDiscrete) issue;
-		int issueNumber = issue.getNumber();
-		randomNum = issueNumber;
-		while (randomNum == issueNumber)
+		try
 		{
-			randomNum = m_rand.nextInt(issueDiscrete.getValues().size());
+			AdditiveUtilitySpace additiveUtilitySpace = (AdditiveUtilitySpace) m_info.getUtilitySpace();
+			List<Issue> issues = additiveUtilitySpace.getDomain().getIssues();
+			
+			int randomNum = m_rand.nextInt(issues.size());
+			Issue issue = issues.get(randomNum);
+			
+			IssueDiscrete issueDiscrete = (IssueDiscrete) issue;
+			int issueNumber = issue.getNumber();
+			randomNum = issueNumber;
+			while (randomNum == issueNumber)
+			{
+				randomNum = m_rand.nextInt(issueDiscrete.getValues().size());
+			}
+			
+			Value newValue = issueDiscrete.getValues().get(randomNum);
+			m_gene.put(issueNumber, newValue);
 		}
-		
-		Value newValue = issueDiscrete.getValues().get(randomNum);
-		m_gene.put(issueNumber, newValue);
+    	catch (Exception e)
+    	{
+			e.printStackTrace();
+		}
+
 	}
 	
 	public void Crossover(Individual other)
 	{
-		AdditiveUtilitySpace additiveUtilitySpace = (AdditiveUtilitySpace) m_info.getUtilitySpace();
-		List<Issue> issues = additiveUtilitySpace.getDomain().getIssues();
-		
-		if (1 < issues.size()) // otherwise no need to crossover
+		try
 		{
-			int randomNum = m_rand.nextInt(issues.size() - 1) + 1; // minus one since crossover location is in gap between alleles
+			AdditiveUtilitySpace additiveUtilitySpace = (AdditiveUtilitySpace) m_info.getUtilitySpace();
+			List<Issue> issues = additiveUtilitySpace.getDomain().getIssues();
 			
-			for (Integer key : m_gene.keySet())
+			if (1 < issues.size()) // otherwise no need to crossover
 			{
-				if (key > randomNum)
-				{	
-					break;
-				}
+				int randomNum = m_rand.nextInt(issues.size() - 1) + 1; // minus one since crossover location is in gap between alleles
 				
-				Value temp = m_gene.get(key);
-				m_gene.put(key, other.GetValue(key));
-				other.SetValue(key, temp);
+				for (Integer key : m_gene.keySet())
+				{
+					if (key > randomNum)
+					{	
+						break;
+					}
+					
+					Value temp = m_gene.get(key);
+					m_gene.put(key, other.GetValue(key));
+					other.SetValue(key, temp);
+				}
 			}
+		}
+    	catch (Exception e)
+    	{
+			e.printStackTrace();
 		}
 	}
 }
